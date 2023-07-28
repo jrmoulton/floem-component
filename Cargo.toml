@@ -1,0 +1,15 @@
+[package]
+name = "floem-component"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+floem = {path = "../floem/main"}
+im = "15.1.0"
+paste = "1.0.12"
+colorsys = "0.6.7"
+tokio = "1.29.1"
+lazy_static = "1.4.0"
+console-subscriber = "0.1.10"
