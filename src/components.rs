@@ -2,7 +2,7 @@ use std::{ops::RangeInclusive, sync::atomic::AtomicU16};
 
 use floem::{
     event::Event,
-    reactive::{create_rw_signal, create_signal, ReadSignal, RwSignal, SignalGet, SignalUpdate},
+    reactive::{create_rw_signal, create_signal, ReadSignal, RwSignal},
     responsive::ScreenSize,
     style::{CursorStyle, Display, Position, Style, TextOverflow},
     view::View,
@@ -126,14 +126,16 @@ pub fn pop_over<V: View + 'static>(child: impl FnOnce() -> V + 'static) -> impl 
     })
 }
 
-pub fn freq_dropdown(data: ReadSignal<im::Vector<String>>) -> impl View {
+pub fn freq_dropdown(
+    data: ReadSignal<im::Vector<String>>, on_select: impl Fn(String) + Copy + 'static,
+) -> impl View {
     let dropdown_styles = dropdown::DropDownStyles::default();
     dropdown::dropdown(
         data,
         empty,
         |data_val| label(move || format!("Freq: {} Hz", data_val())),
         |data_val| label(move || format!("{data_val} Hz")),
-        move |_new_size_str: String| {},
+        on_select,
         None,
         create_signal(dropdown_styles).0,
     )
@@ -318,9 +320,10 @@ pub fn label_with_edit_dropdown(
         stack(move || {
             (
                 // Main device label
-                hover_background(move || {
-                    label(display_name).dynamic_style(label_style, label_responsive_color)
-                })
+                hover_background(
+                    move || label(display_name).dynamic_style(label_style, label_responsive_color),
+                    || ColorPalette::POPOVER_BG.base.color(),
+                )
                 .on_resize(main_device_label_size_func)
                 .all_events(label_handlers(display_edit).handlers),
                 // The view to rename the device
@@ -342,13 +345,16 @@ pub fn label_with_edit_dropdown(
     })
 }
 
-pub fn hover_background<V: View>(child: impl FnOnce() -> V + 'static) -> impl View {
-    let (size_fn, size, border_rad) = style::lazy_size_and_rad();
-    let padding_percent = 0.1;
+pub fn hover_background<V: View>(
+    child: impl FnOnce() -> V + 'static,
+    hover_backgound_color: impl Fn() -> floem::peniko::Color + 'static,
+) -> impl View {
+    let (size_fn, _size, border_rad) = style::lazy_size_and_rad();
+    // let padding_percent = 0.1;
     let container_style = move || {
         Style::BASE
-            .padding_horiz_px(size().width as f32 * padding_percent)
-            .padding_vert_px(size().height as f32 * padding_percent)
+            .padding_horiz_px(8.)
+            .padding_vert_px(3.)
             .border_radius(border_rad())
             .items_center()
             .justify_center()
@@ -359,7 +365,7 @@ pub fn hover_background<V: View>(child: impl FnOnce() -> V + 'static) -> impl Vi
             .style(container_style)
             .hover_style(move || {
                 container_style()
-                    .background(ColorPalette::POPOVER_BG.base.color())
+                    .background(hover_backgound_color())
                     .cursor(CursorStyle::Pointer)
             })
     })

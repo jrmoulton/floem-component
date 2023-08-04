@@ -1,6 +1,6 @@
 use floem::{
     peniko::kurbo::Size,
-    reactive::{create_effect, create_rw_signal, use_context, SignalGet, SignalUpdate},
+    reactive::{create_effect, create_rw_signal, use_context},
     style::{Display, Position, Style},
 };
 
@@ -66,7 +66,8 @@ pub fn lazy_popover<
     TF: Fn() -> floem::event::EventListener + 'static,
     PSF: Fn() -> Size + 'static,
 >(
-    toggle_event: TF, parent_size: PSF,
+    toggle_event: TF,
+    parent_size: PSF,
 ) -> (
     impl Fn() -> Style + 'static,
     impl Fn(&floem::event::Event) -> bool,

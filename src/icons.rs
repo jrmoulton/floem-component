@@ -12,13 +12,15 @@ pub const CARET_UP: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="
 pub const ELLIPSIS: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><path d="M8 256a56 56 0 1 1 112 0A56 56 0 1 1 8 256zm160 0a56 56 0 1 1 112 0 56 56 0 1 1 -112 0zm216-56a56 56 0 1 1 0 112 56 56 0 1 1 0-112z"/></svg>"##;
 pub const TOGGLE_OVAL: &str = r##"<?xml version="1.0" encoding="UTF-8"?><svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 383.52 164.37"><defs><style>.cls-1{fill:#010101;}</style></defs><path class="cls-1" d="M82.61,164.37h218.3c45.62,0,82.61-36.13,82.61-81.76S346.54,0,300.91,0H82.61C36.99,0,0,36.99,0,82.61s36.99,81.76,82.61,81.76Z"/></svg>"##;
 pub const CIRCLE: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512z"/></svg>"##;
+pub const CIRCLE_CHECK_SOLID: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM369 209L241 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L335 175c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9z"/></svg>"##;
+pub const CIRCLE_CHECK: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.4.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><path d="M256 48a208 208 0 1 1 0 416 208 208 0 1 1 0-416zm0 464A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM369 209c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0l-111 111-47-47c-9.4-9.4-24.6-9.4-33.9 0s-9.4 24.6 0 33.9l64 64c9.4 9.4 24.6 9.4 33.9 0L369 209z"/></svg>"##;
 
 macro_rules! create_icon_functions {
     ($( $icon:ident ),*) => {
         #[allow(unused)]
         use floem::{
             peniko::Color,
-            reactive::{create_signal, use_context, ReadSignal, SignalGet, SignalUpdate, WriteSignal},
+            reactive::{create_signal, use_context, ReadSignal, WriteSignal},
             style::*,
             view::View,
             views::*,
@@ -45,5 +47,7 @@ create_icon_functions!(
     ELLIPSIS,
     TOGGLE_OVAL,
     CIRCLE,
+    CIRCLE_CHECK,
+    CIRCLE_CHECK_SOLID,
     LEV_LOGO
 );

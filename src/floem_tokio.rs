@@ -1,9 +1,8 @@
 use std::{future::Future, time::Duration};
 
 use floem::{
-    crossbeam_channel,
     ext_event::create_signal_from_channel,
-    reactive::{create_effect, create_rw_signal, ReadSignal, SignalGet, SignalUpdate, SignalWith},
+    reactive::{create_effect, create_rw_signal, ReadSignal},
 };
 use lazy_static::lazy_static;
 use tokio::sync::broadcast;
@@ -20,10 +19,11 @@ lazy_static! {
     };
 }
 
-pub async fn cancelable_task(name: String, task: impl Future) {
-    let mut cancel = CANCEL.receiver.resubscribe();
+pub async fn cancelable_task(
+    name: String, cancel_token: tokio_util::sync::CancellationToken, task: impl Future,
+) {
     tokio::select! {
-        _ = cancel.recv() => {
+        _ = cancel_token.cancelled() => {
             println!("Cancellation signal received. Exiting task {name}..."); // Exit the loop when the cancellation signal is received
         }
         _ = task => {}
@@ -48,10 +48,11 @@ impl<T: Clone + 'static> Resource<T> {
 pub fn create_resource<S, T, Fu>(
     task_name: &str, source: impl Fn() -> S + 'static,
     fetcher: impl Fn(S) -> Fu + Send + Sync + 'static,
+    cancel_token: tokio_util::sync::CancellationToken,
 ) -> Resource<T>
 where
     S: Clone + std::fmt::Debug + Send + 'static,
-    T: Send + 'static,
+    T: Send + 'static + Clone,
     Fu: Future<Output = T> + Send + 'static,
 {
     let (tx, rx) = crossbeam_channel::unbounded();
@@ -69,16 +70,20 @@ where
     });
     tokio::task::Builder::new()
         .name(task_name)
-        .spawn(cancelable_task(task_name.to_owned(), async move {
-            while let Some(value) = rx2.recv().await {
-                let fetched = fetcher(value).await;
-                tx.send(fetched).unwrap();
-            }
-        }))
+        .spawn(cancelable_task(
+            task_name.to_owned(),
+            cancel_token,
+            async move {
+                while let Some(value) = rx2.recv().await {
+                    let fetched = fetcher(value).await;
+                    tx.send(fetched).unwrap();
+                }
+            },
+        ))
         .unwrap();
     let signal = create_signal_from_channel(rx);
     create_effect(move |_| {
-        signal.track();
+        signal.get();
         loading.update(|val| *val = false);
     });
     Resource {
@@ -89,6 +94,7 @@ where
 
 pub fn create_polled_resource<T, Fu>(
     task_name: &str, interval: Duration, fetcher: impl Fn() -> Fu + Send + Sync + Clone + 'static,
+    cancel_token: tokio_util::sync::CancellationToken,
 ) -> ReadSignal<Option<T>>
 where
     T: Send + 'static,
@@ -97,14 +103,18 @@ where
     let (tx, rx) = crossbeam_channel::unbounded();
     tokio::task::Builder::new()
         .name(task_name)
-        .spawn(cancelable_task(task_name.to_owned(), async move {
-            let mut interval = tokio::time::interval(interval);
-            loop {
-                interval.tick().await;
-                let fetched = fetcher().await;
-                tx.send(fetched).unwrap();
-            }
-        }))
+        .spawn(cancelable_task(
+            task_name.to_owned(),
+            cancel_token,
+            async move {
+                let mut interval = tokio::time::interval(interval);
+                loop {
+                    interval.tick().await;
+                    let fetched = fetcher().await;
+                    tx.send(fetched).unwrap();
+                }
+            },
+        ))
         .unwrap();
     create_signal_from_channel(rx)
 }
@@ -112,6 +122,7 @@ where
 pub fn run_task<S, Fu>(
     task_name: &str, source: impl Fn() -> S + 'static,
     runner: impl Fn(S) -> Fu + Send + Sync + 'static,
+    cancel_token: tokio_util::sync::CancellationToken,
 ) where
     S: Clone + std::fmt::Debug + Send + 'static,
     Fu: Future<Output = ()> + Send + 'static,
@@ -128,11 +139,15 @@ pub fn run_task<S, Fu>(
     });
     tokio::task::Builder::new()
         .name(task_name)
-        .spawn(cancelable_task(task_name.to_owned(), async move {
-            while let Some(value) = rx2.recv().await {
-                runner(value).await;
-            }
-        }))
+        .spawn(cancelable_task(
+            task_name.to_owned(),
+            cancel_token,
+            async move {
+                while let Some(value) = rx2.recv().await {
+                    runner(value).await;
+                }
+            },
+        ))
         .unwrap();
 }
 

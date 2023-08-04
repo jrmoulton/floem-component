@@ -1,14 +1,5 @@
 use floem::{
-    reactive::{
-        create_effect,
-        create_rw_signal,
-        use_context,
-        ReadSignal,
-        RwSignal,
-        SignalGet,
-        SignalUpdate,
-        SignalWith,
-    },
+    reactive::{create_effect, create_rw_signal, use_context, ReadSignal, RwSignal},
     style::{Display, JustifyContent, Position, Style, TextOverflow},
     view::View,
     views::*,
@@ -63,9 +54,13 @@ enum ArrowSelect {
 }
 
 pub fn dropdown<SAPF, MAPF, V, V2, V3>(
-    data: ReadSignal<im::Vector<String>>, name_icon: impl Fn() -> V, main_apperance: MAPF,
-    scroll_apperance: SAPF, on_select: impl Fn(String) + 'static + Copy,
-    default_val: Option<String>, styles: ReadSignal<DropDownStyles>,
+    data: ReadSignal<im::Vector<String>>,
+    name_icon: impl Fn() -> V,
+    main_apperance: MAPF,
+    scroll_apperance: SAPF,
+    on_select: impl Fn(String) + 'static + Copy,
+    default_val: Option<String>,
+    styles: ReadSignal<DropDownStyles>,
 ) -> impl View
 where
     V: View + 'static,
@@ -188,7 +183,9 @@ where
 }
 
 fn arrow_and_container(
-    selector: ArrowSelect, styles: ReadSignal<DropDownStyles>, on_click: impl Fn() + 'static,
+    selector: ArrowSelect,
+    styles: ReadSignal<DropDownStyles>,
+    on_click: impl Fn() + 'static,
 ) -> impl View {
     let active = create_rw_signal(false);
     container(move || {
@@ -229,7 +226,9 @@ fn arrow_and_container(
 }
 
 fn increment_and_select(
-    selector: ArrowSelect, inner_text_idx: RwSignal<usize>, data: ReadSignal<im::Vector<String>>,
+    selector: ArrowSelect,
+    inner_text_idx: RwSignal<usize>,
+    data: ReadSignal<im::Vector<String>>,
     on_select: impl Fn(String) + 'static + Copy,
 ) -> bool {
     inner_text_idx.update(|val| {
@@ -247,8 +246,10 @@ fn increment_and_select(
 }
 
 fn up_down_buttons(
-    inner_text_idx: RwSignal<usize>, data: ReadSignal<im::Vector<String>>,
-    on_select: impl Fn(String) + 'static + Copy, styles: ReadSignal<DropDownStyles>,
+    inner_text_idx: RwSignal<usize>,
+    data: ReadSignal<im::Vector<String>>,
+    on_select: impl Fn(String) + 'static + Copy,
+    styles: ReadSignal<DropDownStyles>,
 ) -> impl View {
     stack(|| {
         (

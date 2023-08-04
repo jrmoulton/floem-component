@@ -5,15 +5,7 @@ use floem::{
     event::{Event, EventListener},
     glazier::kurbo,
     peniko::{self, kurbo::Size, Color},
-    reactive::{
-        create_effect,
-        create_rw_signal,
-        use_context,
-        RwSignal,
-        SignalGet,
-        SignalUpdate,
-        Trigger,
-    },
+    reactive::{create_effect, create_rw_signal, use_context, RwSignal, Trigger},
     style::{Display, Position, Style},
     view::View,
     views::Decorators,
@@ -124,7 +116,12 @@ impl HSLColor {
     /// light: 0-100
     /// alpha: 0-100
     pub const fn new(hue: u8, sat: u8, light: u8, alpha: u8) -> Self {
-        Self { hue, sat, light, alpha }
+        Self {
+            hue,
+            sat,
+            light,
+            alpha,
+        }
     }
 
     /// increse the hue py a percentage value. The value will be capped at 100%.
@@ -368,13 +365,15 @@ impl LightDark {
 
 pub trait ExtDynamicStyle {
     fn dynamic_style(
-        self, style: impl Fn() -> Style + Copy + 'static,
+        self,
+        style: impl Fn() -> Style + Copy + 'static,
         color: impl Fn() -> ResponsiveColor + Copy + 'static,
     ) -> Self;
 }
 impl<T: View + Decorators> ExtDynamicStyle for T {
     fn dynamic_style(
-        self, style: impl Fn() -> Style + Copy + 'static,
+        self,
+        style: impl Fn() -> Style + Copy + 'static,
         color: impl Fn() -> ResponsiveColor + Copy + 'static,
     ) -> Self {
         self.style(move || style().color(color().base.color()))
@@ -605,7 +604,8 @@ pub fn channel() -> Style {
 }
 
 pub fn scrollable_dropdown<DSF: Fn() -> bool, PSF: Fn() -> Size>(
-    display_scroll: DSF, parent_size: PSF,
+    display_scroll: DSF,
+    parent_size: PSF,
 ) -> Style {
     let border_color = LightDark::new(ColorPalette::LIGHT3, ColorPalette::DARK3).reverse();
     Style::BASE
