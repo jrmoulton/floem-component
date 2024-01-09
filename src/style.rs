@@ -3,13 +3,12 @@ use std::{marker::PhantomData, ops::Deref};
 use colorsys::ColorAlpha;
 use floem::{
     event::{Event, EventListener},
-    glazier::kurbo,
-    peniko::{self, kurbo::Size, Color},
+    kurbo,
+    peniko::{self, Color},
     reactive::{create_effect, create_rw_signal, use_context, RwSignal, Trigger},
-    style::{Display, Position, Style},
+    style::{Style, StyleProp, Transition},
     view::View,
     views::Decorators,
-    ViewContext,
 };
 use paste::paste;
 
@@ -51,53 +50,6 @@ macro_rules! generate_hsl_methods {
             }
         )*
     };
-}
-
-#[derive(Clone, Copy)]
-pub struct WindowClicked(pub Trigger);
-impl Deref for WindowClicked {
-    type Target = Trigger;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-pub fn windowclicked_notify() {
-    let window_clicked = use_context::<WindowClicked>().unwrap();
-    window_clicked.notify();
-}
-
-pub type DarkMode = bool;
-
-pub type BorderRadiusPercent = f32;
-
-#[derive(Clone, Copy)]
-pub struct PopOver(pub Trigger);
-impl Deref for PopOver {
-    type Target = Trigger;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-pub fn follow_popover(visible_state: RwSignal<bool>) {
-    let pop_over = use_context::<PopOver>().unwrap();
-    create_effect(move |_| {
-        pop_over.track();
-        visible_state.update(|val| *val = false);
-    });
-}
-pub fn popover_notify() {
-    let pop_over = use_context::<PopOver>().unwrap();
-    pop_over.notify();
-}
-
-pub struct BorderWidths;
-#[allow(unused)]
-impl BorderWidths {
-    pub const LG: f32 = 4.;
-    pub const MD: f32 = 3.;
-    pub const SM: f32 = 2.;
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -158,15 +110,20 @@ impl HSLColor {
             .increase_cap_alpha(50)
     }
 
-    pub const fn fg_color(self) -> Self {
-        if self.light < 50 {
-            ColorPalette::LIGHT1
-        } else {
-            ColorPalette::DARK1
-        }
+    pub const fn set_alpha(mut self, val: u8) -> Self {
+        self.alpha = val;
+        self
     }
 
-    pub fn color(self) -> floem::peniko::Color {
+    // pub const fn fg_color(self) -> Self {
+    //     if self.light < 50 {
+    //         ColorPalette::LIGHT1
+    //     } else {
+    //         ColorPalette::DARK1
+    //     }
+    // }
+
+    pub fn color(self) -> Color {
         let color = colorsys::Rgb::from(colorsys::Hsl::from(self));
 
         peniko::Color::rgba(
@@ -199,32 +156,97 @@ impl From<HSLColor> for colorsys::Hsl {
     }
 }
 
-pub struct ColorPalette {}
-#[allow(unused)]
-impl ColorPalette {
-    pub const ACCENT: HSLColor = HSLColor::new(48, 75, 26, 100);
-    pub const ACCENT_DARK: HSLColor = Self::ACCENT.increase_cap_sat(20);
-    pub const ACCENT_LD: LightDark =
-        LightDark::new(ColorPalette::ACCENT, ColorPalette::ACCENT_DARK);
-    pub const ACCENT_RESP: ResponsiveColor = ResponsiveColor::from_lightdark(Self::ACCENT_LD)
-        .reduce_active_to_hover()
-        .set_hover_to_base();
-    pub const BLUE: HSLColor = HSLColor::new(70, 99, 26, 100);
-    pub const BORDER_LD: LightDark = LightDark::new(ColorPalette::DARK1, ColorPalette::LIGHT2);
-    pub const CURSOR_LD: LightDark =
-        LightDark::new(ColorPalette::LIGHT1, ColorPalette::DARK1).reverse();
-    pub const DARK1: HSLColor = HSLColor::new(63, 6, 13, 100);
-    pub const DARK2: HSLColor = Self::DARK1.increase_cap_light(10);
-    pub const DARK3: HSLColor = Self::DARK2.increase_cap_light(10);
-    pub const DARK4: HSLColor = Self::DARK3.increase_cap_light(10);
-    pub const DROPDOWN_BG: LightDark = LightDark::new(Self::LIGHT1, Self::DARK1);
-    pub const LIGHT1: HSLColor = HSLColor::new(61, 13, 96, 100);
-    pub const LIGHT2: HSLColor = Self::LIGHT1.decrease_cap_light(10);
-    pub const LIGHT3: HSLColor = Self::LIGHT2.decrease_cap_light(10);
-    pub const LIGHT4: HSLColor = Self::LIGHT3.decrease_cap_light(10);
-    pub const POPOVER_BG: ResponsiveColor =
-        ResponsiveColor::from_lightdark(LightDark::new(Self::LIGHT2, Self::DARK1));
-    pub const TRANSPARENT: HSLColor = HSLColor::new(0, 0, 0, 0);
+#[derive(Clone, Copy)]
+pub struct WindowClicked(pub Trigger);
+impl Deref for WindowClicked {
+    type Target = Trigger;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+pub fn windowclicked_notify() {
+    let window_clicked = use_context::<WindowClicked>().unwrap();
+    window_clicked.notify();
+}
+
+pub type DarkMode = bool;
+
+pub type BorderRadiusPercent = f32;
+
+pub type PopOver = Trigger;
+pub fn follow_popover(visible_state: RwSignal<bool>) {
+    let pop_over = use_context::<PopOver>().unwrap();
+    create_effect(move |_| {
+        pop_over.track();
+        visible_state.set(false);
+    });
+}
+pub fn popover_notify() {
+    let pop_over = use_context::<PopOver>().unwrap();
+    pop_over.notify();
+}
+
+pub trait DesignSystem {
+    const TEXT: ResponsiveColor;
+    const BACKGROUND: ResponsiveColor;
+    const PRIMARY: ResponsiveColor;
+    const SECONDARY: ResponsiveColor;
+    const ACCENT: ResponsiveColor;
+    const FONT_FAMILY: &'static str;
+    const BASE_FONT_SIZE: f32;
+    const BORDER_NORMAL: f32;
+    const PADDING: f32;
+    const SCROLL_BAR_WIDTH: f32 = 10.;
+    const BORDER_RADIUS: f64 = 7.;
+
+    const TRANSPARENT: Color = Color::TRANSPARENT;
+
+    // computed colors
+    const BACKGROUND_2: ResponsiveColor = ResponsiveColor::from_lightdark(
+        Self::BACKGROUND
+            .base
+            .light_decrease_cap_light(10)
+            .dark_increase_cap_light(10),
+    );
+    const BACKGROUND_3: ResponsiveColor = ResponsiveColor::from_lightdark(
+        Self::BACKGROUND_2
+            .base
+            .light_decrease_cap_light(10)
+            .dark_increase_cap_light(10),
+    );
+    const BACKGROUND_EXT: ResponsiveColor = ResponsiveColor::from_lightdark(
+        Self::BACKGROUND
+            .base
+            .light_increase_cap_light(10)
+            .dark_decrease_cap_light(10),
+    );
+
+    const HOVER_BACKGROUND: ResponsiveColor = ResponsiveColor {
+        base: LightDark::transparent(),
+        hover: Self::BACKGROUND.base,
+        active: Self::BACKGROUND.hover,
+    };
+
+    const HOVER_ACCENT: ResponsiveColor = ResponsiveColor {
+        base: Self::BACKGROUND.base,
+        hover: Self::ACCENT.base,
+        active: Self::ACCENT.hover,
+    };
+    const HOVER_ACCENT_2: ResponsiveColor = ResponsiveColor {
+        base: Self::BACKGROUND_2.base,
+        hover: Self::ACCENT.base,
+        active: Self::ACCENT.hover,
+    };
+    const HOVER_ACCENT_3: ResponsiveColor = ResponsiveColor {
+        base: Self::BACKGROUND_3.base,
+        hover: Self::ACCENT.base,
+        active: Self::ACCENT.hover,
+    };
+
+    // computed borders
+    const BORDER_BIG: f32 = Self::BORDER_NORMAL * 2.;
+    const BORDER_SMALL: f32 = Self::BORDER_NORMAL / 2.;
 }
 
 macro_rules! generate_lightdark_methods {
@@ -266,19 +288,11 @@ enum LightModeDefault {
 
 #[derive(Clone, Copy, Debug)]
 pub struct LightDark {
-    light: HSLColor,
-    dark: HSLColor,
+    pub light: HSLColor,
+    pub dark: HSLColor,
     light_mode_default: LightModeDefault,
 }
-impl Default for LightDark {
-    fn default() -> Self {
-        Self {
-            light: ColorPalette::LIGHT1,
-            dark: ColorPalette::DARK1,
-            light_mode_default: LightModeDefault::Light,
-        }
-    }
-}
+
 #[allow(unused)]
 impl LightDark {
     generate_lightdark_methods!(light, dark; sat, light, alpha);
@@ -308,7 +322,6 @@ impl LightDark {
     }
 
     fn get_base(self) -> HSLColor {
-        let cx = ViewContext::get_current();
         let dark_mode = use_context::<RwSignal<DarkMode>>().unwrap();
         match (dark_mode.get(), self.light_mode_default) {
             (true, LightModeDefault::Light) => self.dark,
@@ -318,12 +331,8 @@ impl LightDark {
         }
     }
 
-    pub fn color(self) -> floem::peniko::Color {
+    pub fn color(self) -> Color {
         self.get_base().color()
-    }
-
-    pub fn fg_color(self) -> HSLColor {
-        self.get_base().fg_color()
     }
 
     pub const fn new(light: HSLColor, dark: HSLColor) -> Self {
@@ -356,42 +365,53 @@ impl LightDark {
 
     pub const fn transparent() -> Self {
         Self {
-            light: ColorPalette::TRANSPARENT,
-            dark: ColorPalette::TRANSPARENT,
+            light: HSLColor::new(0, 0, 0, 0),
+            dark: HSLColor::new(0, 0, 0, 0),
             light_mode_default: LightModeDefault::Light,
         }
     }
+
+    pub const fn set_alpha(mut self, val: u8) -> Self {
+        self.light = self.light.set_alpha(val);
+        self.dark = self.dark.set_alpha(val);
+        self
+    }
 }
 
-pub trait ExtDynamicStyle {
-    fn dynamic_style(
-        self,
-        style: impl Fn() -> Style + Copy + 'static,
-        color: impl Fn() -> ResponsiveColor + Copy + 'static,
-    ) -> Self;
+pub trait ExtDynamicColor<T> {
+    fn dynamic_color(self, prop: T, color: ResponsiveColor) -> Self;
+    fn ld_color(self, prop: T, color: LightDark) -> Self;
 }
-impl<T: View + Decorators> ExtDynamicStyle for T {
-    fn dynamic_style(
-        self,
-        style: impl Fn() -> Style + Copy + 'static,
-        color: impl Fn() -> ResponsiveColor + Copy + 'static,
-    ) -> Self {
-        self.style(move || style().color(color().base.color()))
-            .hover_style(move || style().color(color().hover.color()))
-            .active_style(move || style().color(color().active.color()))
+impl<T: StyleProp<Type = Option<Color>>> ExtDynamicColor<T> for Style {
+    fn dynamic_color(self, prop: T, color: ResponsiveColor) -> Self {
+        self.set(prop, color.base.color())
+            .hover(move |s| s.set(prop, color.hover.color()))
+            .active(move |s| s.set(prop, color.active.color()))
+            .transition(prop, Transition::linear(0.1))
+    }
+
+    fn ld_color(self, prop: T, color: LightDark) -> Self {
+        self.set(prop, color.color())
+            .transition(prop, Transition::linear(0.1))
     }
 }
 
 pub trait ExtAnyEvent {
     fn all_events(
         self,
-        handlers: std::collections::HashMap<EventListener, Box<dyn Fn(&Event) -> bool + 'static>>,
+        handlers: std::collections::HashMap<
+            EventListener,
+            Box<dyn Fn(&Event) -> floem::EventPropagation + 'static>,
+        >,
     ) -> Self;
 }
 impl<T: View + Decorators> ExtAnyEvent for T {
     fn all_events(
         mut self,
-        handlers: std::collections::HashMap<EventListener, Box<dyn Fn(&Event) -> bool + 'static>>,
+        handlers: std::collections::HashMap<
+            EventListener,
+            Box<dyn Fn(&Event) -> floem::EventPropagation + 'static>,
+        >,
     ) -> Self {
         for handler in handlers {
             self = self.on_event(handler.0, handler.1);
@@ -449,7 +469,7 @@ impl EventHandlers {
     }
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct ResponsiveColor {
     pub base: LightDark,
     pub hover: LightDark,
@@ -458,11 +478,6 @@ pub struct ResponsiveColor {
 
 #[allow(unused)]
 impl ResponsiveColor {
-    pub fn new_reactive() -> Self {
-        let base = LightDark::default();
-        Self::from_lightdark(base)
-    }
-
     pub const fn from_lightdark(color: LightDark) -> Self {
         Self {
             base: color,
@@ -473,6 +488,13 @@ impl ResponsiveColor {
                 .dark_increase_cap_light(20)
                 .light_decrease_cap_light(20),
         }
+    }
+
+    pub const fn reverse(mut self) -> Self {
+        self.base = self.base.reverse();
+        self.hover = self.hover.reverse();
+        self.active = self.active.reverse();
+        self
     }
 
     pub const fn disable_base(mut self) -> Self {
@@ -499,6 +521,19 @@ impl ResponsiveColor {
         self.active = self.hover;
         self
     }
+
+    pub const fn set_alpha(mut self, val: u8) -> Self {
+        self.base = self.base.set_alpha(val);
+        self.hover = self.hover.set_alpha(val);
+        self.active = self.active.set_alpha(val);
+        self
+    }
+}
+impl ResponsiveColor {
+    pub const WHITE_BLACK: Self = Self::from_lightdark(LightDark::new(
+        HSLColor::new(0, 100, 95, 100),
+        HSLColor::new(0, 100, 5, 100),
+    ));
 }
 
 // return the border radius in pixels
@@ -506,54 +541,37 @@ pub fn border_radius(rect: kurbo::Rect) -> f32 {
     let border_radius_percent = use_context::<RwSignal<BorderRadiusPercent>>()
         .unwrap()
         .get();
-    let val = ((rect.x1 - rect.x0).min(rect.y1 - rect.y0) as f32) * border_radius_percent;
-    val
+
+    ((rect.x1 - rect.x0).min(rect.y1 - rect.y0) as f32) * border_radius_percent
 }
 
 pub fn lazy_border_rad() -> (
-    impl Fn(kurbo::Point, kurbo::Rect) + Copy + 'static,
+    impl Fn(kurbo::Rect) + Copy + 'static,
     impl Fn() -> f32 + 'static + Copy,
 ) {
     let rect_sig = create_rw_signal(kurbo::Rect::ZERO);
     (
-        move |_pos, rect| rect_sig.update(|val| *val = rect),
+        move |rect| rect_sig.update(|val| *val = rect),
         move || border_radius(rect_sig.get()),
     )
 }
 pub fn lazy_size() -> (
-    impl Fn(kurbo::Point, kurbo::Rect) + 'static,
+    impl Fn(kurbo::Rect) + 'static,
     impl Fn() -> kurbo::Size + 'static + Copy,
 ) {
     let signal = create_rw_signal(kurbo::Size::default());
-    let func = move |_pos, rect: kurbo::Rect| signal.update(|val| *val = rect.size());
+    let func = move |rect: kurbo::Rect| signal.update(|val| *val = rect.size());
     (func, move || signal.get())
 }
 
-pub fn lazy_size_and_point() -> (
-    impl Fn(kurbo::Point, kurbo::Rect) + 'static,
-    impl Fn() -> kurbo::Size + 'static + Copy,
-    impl Fn() -> kurbo::Point + 'static + Copy,
-) {
-    let size = create_rw_signal(kurbo::Size::default());
-    let point = create_rw_signal(kurbo::Point::default());
-    let func = move |pos, rect: kurbo::Rect| {
-        size.update(|val| {
-            val.width = rect.x1 - rect.x0;
-            val.height = rect.y1 - rect.y0;
-        });
-        point.update(|val| *val = pos);
-    };
-    (func, move || size.get(), move || point.get())
-}
-
 pub fn lazy_size_and_rad() -> (
-    impl Fn(kurbo::Point, kurbo::Rect) + 'static,
+    impl Fn(kurbo::Rect) + 'static,
     impl Fn() -> kurbo::Size + 'static + Copy,
     impl Fn() -> f32 + 'static + Copy,
 ) {
     let rect_sig = create_rw_signal(kurbo::Rect::ZERO);
     let size_signal = create_rw_signal(kurbo::Size::default());
-    let func = move |_pos, rect: kurbo::Rect| {
+    let func = move |rect: kurbo::Rect| {
         rect_sig.update(|val| *val = rect);
         size_signal.update(|val| {
             val.width = rect.x1 - rect.x0;
@@ -565,59 +583,4 @@ pub fn lazy_size_and_rad() -> (
         move || size_signal.get(),
         move || border_radius(rect_sig.get()),
     )
-}
-
-pub const MAIN_VERT_PADDING: f32 = 2.5;
-
-pub fn scroll_bar_color() -> Color {
-    let color = LightDark::default()
-        .dark_increase_cap_light(10)
-        .light_decrease_cap_alpha(30)
-        .dark_decrease_cap_alpha(30)
-        .reverse();
-    color.color()
-}
-
-pub fn draw_box(width: impl Fn() -> f32) -> Style {
-    let background = LightDark::new(ColorPalette::LIGHT2, ColorPalette::DARK1);
-
-    Style::BASE
-        .width_pct(100.)
-        .height_px(width() / 2.)
-        .min_height_px(width() / 2.)
-        .border(BorderWidths::MD)
-        .border_color(ColorPalette::BORDER_LD.color())
-        .background(background.color())
-}
-
-pub fn dropdown_cont() -> Style {
-    Style::BASE
-        .padding_vert_px(MAIN_VERT_PADDING)
-        .width_pct(100.)
-}
-
-pub fn channel() -> Style {
-    Style::BASE
-        .flex_col()
-        .items_center()
-        .size_pct(70. / 2., 70. / 2.)
-}
-
-pub fn scrollable_dropdown<DSF: Fn() -> bool, PSF: Fn() -> Size>(
-    display_scroll: DSF,
-    parent_size: PSF,
-) -> Style {
-    let border_color = LightDark::new(ColorPalette::LIGHT3, ColorPalette::DARK3).reverse();
-    Style::BASE
-        .apply_if(!display_scroll(), |s| {
-            s.display(Display::None).height_px(0.).width_px(0.)
-        })
-        .z_index(1)
-        .position(Position::Absolute)
-        .width_pct(70.)
-        .height_px(20. * 10.)
-        .inset_top_px(parent_size().height as f32 + 3.)
-        .border(2.)
-        .border_color(border_color.color())
-        .border_radius(border_radius(parent_size().to_rect()))
 }

@@ -2,6 +2,7 @@
 name = "floem-component"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,8 +11,14 @@ floem = {path = "../floem/main"}
 im = "15.1.0"
 paste = "1.0.12"
 colorsys = "0.6.7"
-tokio = "1.29.1"
+tokio = { version = "1.29.1", features = ["rt", "time", "macros"], optional = true }
 lazy_static = "1.4.0"
-console-subscriber = "0.1.10"
 tokio-util = "0.7.8"
 crossbeam-channel = "0.5.8"
+font-awesome = "0.2.0"
+
+[features]
+tokio_feature = ["tokio"]
+
+
+

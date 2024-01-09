@@ -4,31 +4,6 @@ use floem::{
     ext_event::create_signal_from_channel,
     reactive::{create_effect, create_rw_signal, ReadSignal},
 };
-use lazy_static::lazy_static;
-use tokio::sync::broadcast;
-
-pub struct Cancel {
-    pub sender: broadcast::Sender<()>,
-    pub receiver: broadcast::Receiver<()>,
-}
-
-lazy_static! {
-    pub static ref CANCEL: Cancel = {
-        let val = broadcast::channel::<()>(1);
-        Cancel { sender: val.0, receiver: val.1 }
-    };
-}
-
-pub async fn cancelable_task(
-    name: String, cancel_token: tokio_util::sync::CancellationToken, task: impl Future,
-) {
-    tokio::select! {
-        _ = cancel_token.cancelled() => {
-            println!("Cancellation signal received. Exiting task {name}..."); // Exit the loop when the cancellation signal is received
-        }
-        _ = task => {}
-    }
-}
 
 #[derive(Clone, Copy)]
 pub struct Resource<T: 'static> {
@@ -46,9 +21,7 @@ impl<T: Clone + 'static> Resource<T> {
 }
 
 pub fn create_resource<S, T, Fu>(
-    task_name: &str, source: impl Fn() -> S + 'static,
-    fetcher: impl Fn(S) -> Fu + Send + Sync + 'static,
-    cancel_token: tokio_util::sync::CancellationToken,
+    source: impl Fn() -> S + 'static, fetcher: impl Fn(S) -> Fu + Send + Sync + 'static,
 ) -> Resource<T>
 where
     S: Clone + std::fmt::Debug + Send + 'static,
@@ -68,19 +41,12 @@ where
         }
         Some(())
     });
-    tokio::task::Builder::new()
-        .name(task_name)
-        .spawn(cancelable_task(
-            task_name.to_owned(),
-            cancel_token,
-            async move {
-                while let Some(value) = rx2.recv().await {
-                    let fetched = fetcher(value).await;
-                    tx.send(fetched).unwrap();
-                }
-            },
-        ))
-        .unwrap();
+    tokio::task::spawn(async move {
+        while let Some(value) = rx2.recv().await {
+            let fetched = fetcher(value).await;
+            tx.send(fetched).unwrap();
+        }
+    });
     let signal = create_signal_from_channel(rx);
     create_effect(move |_| {
         signal.get();
@@ -93,36 +59,26 @@ where
 }
 
 pub fn create_polled_resource<T, Fu>(
-    task_name: &str, interval: Duration, fetcher: impl Fn() -> Fu + Send + Sync + Clone + 'static,
-    cancel_token: tokio_util::sync::CancellationToken,
+    interval: Duration, fetcher: impl Fn() -> Fu + Send + Sync + Clone + 'static,
 ) -> ReadSignal<Option<T>>
 where
     T: Send + 'static,
     Fu: Future<Output = T> + Send + 'static,
 {
     let (tx, rx) = crossbeam_channel::unbounded();
-    tokio::task::Builder::new()
-        .name(task_name)
-        .spawn(cancelable_task(
-            task_name.to_owned(),
-            cancel_token,
-            async move {
-                let mut interval = tokio::time::interval(interval);
-                loop {
-                    interval.tick().await;
-                    let fetched = fetcher().await;
-                    tx.send(fetched).unwrap();
-                }
-            },
-        ))
-        .unwrap();
+    tokio::task::spawn(async move {
+        let mut interval = tokio::time::interval(interval);
+        loop {
+            interval.tick().await;
+            let fetched = fetcher().await;
+            tx.send(fetched).unwrap();
+        }
+    });
     create_signal_from_channel(rx)
 }
 
 pub fn run_task<S, Fu>(
-    task_name: &str, source: impl Fn() -> S + 'static,
-    runner: impl Fn(S) -> Fu + Send + Sync + 'static,
-    cancel_token: tokio_util::sync::CancellationToken,
+    source: impl Fn() -> S + 'static, runner: impl Fn(S) -> Fu + Send + Sync + 'static,
 ) where
     S: Clone + std::fmt::Debug + Send + 'static,
     Fu: Future<Output = ()> + Send + 'static,
@@ -137,29 +93,21 @@ pub fn run_task<S, Fu>(
         }
         Some(())
     });
-    tokio::task::Builder::new()
-        .name(task_name)
-        .spawn(cancelable_task(
-            task_name.to_owned(),
-            cancel_token,
-            async move {
-                while let Some(value) = rx2.recv().await {
-                    runner(value).await;
-                }
-            },
-        ))
-        .unwrap();
+    tokio::task::spawn(async move {
+        while let Some(value) = rx2.recv().await {
+            runner(value).await;
+        }
+    });
 }
 
 pub fn run_task_if<S, Fu>(
-    task_name: &str, condition: impl Fn() -> bool + 'static, source: impl Fn() -> S + 'static,
+    condition: impl Fn() -> bool + 'static, source: impl Fn() -> S + 'static,
     runner: impl Fn(S) -> Fu + Send + Sync + 'static,
 ) where
     S: Clone + std::fmt::Debug + Send + 'static,
     Fu: Future<Output = ()> + Send + 'static,
 {
     let (tx2, mut rx2) = tokio::sync::mpsc::unbounded_channel();
-    let mut cancel_clone = CANCEL.receiver.resubscribe();
     create_effect(move |val| {
         // tracking value
         let value = source();
@@ -170,24 +118,17 @@ pub fn run_task_if<S, Fu>(
         }
         Some(())
     });
-    tokio::task::Builder::new()
-        .name(task_name)
-        .spawn(async move {
-            loop {
-                tokio::select! {
-                    _ = cancel_clone.recv() => {
-                        println!("Cancellation signal received. Exiting task run task if...");
-                        break; // Exit the loop when the cancellation signal is received
+    tokio::task::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = async {
+                    while let Some(value) = rx2.recv().await {
+                        runner(value).await;
                     }
-                    _ = async {
-                        while let Some(value) = rx2.recv().await {
-                            runner(value).await;
-                        }
-                    } =>  {
-                        break;
-                    }
+                } =>  {
+                    break;
                 }
             }
-        })
-        .unwrap();
+        }
+    });
 }
