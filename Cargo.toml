@@ -7,7 +7,7 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-floem = {path = "../floem/main"}
+floem = {git = "https://github.com/lapce/floem"}
 im = "15.1.0"
 paste = "1.0.12"
 colorsys = "0.6.7"
